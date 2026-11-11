@@ -66,47 +66,30 @@ class MeuJogo extends JS_CG_2D_API {
     this.direcao = 1;
     this.puloSegurado = false;
     this.botaoAtivo = false;
+    this.ponteAtiva = false;
     this.portaAberta = false;
     this.cameraX = 0;
 
     const chao = (x1, x2) => new Retangulo2D(x1, CHAO_Y, x2 - x1, 40);
 
     this.portao = new Retangulo2D(1330, PORTAO_Y_FECHADO, 20, 220);
-
-    // Portões adicionais, controlados individualmente por botões
-    this.portoesExtras = [
-      { caixa: new Retangulo2D(650, PORTAO_Y_FECHADO, 20, 220), aberto: false },
-      {
-        caixa: new Retangulo2D(1060, PORTAO_Y_FECHADO, 20, 220),
-        aberto: false,
-      },
-    ];
-
-    // Botões das novas barreiras; cada botão libera somente seu portão
-    this.botoesExtras = [
-      {
-        caixa: new Retangulo2D(510, CHAO_Y - 8, 55, 8),
-        ativado: false,
-        indice: 0,
-      },
-      {
-        caixa: new Retangulo2D(955, CHAO_Y - 8, 55, 8),
-        ativado: false,
-        indice: 1,
-      },
-    ];
+    this.ponte = new Retangulo2D(650, 500, 200, 20);
+    this.botaoPonte = new Retangulo2D(520, CHAO_Y - 8, 56, 8);
 
     this.solidos = [
       chao(0, 340),
-      chao(440, 700),
-      chao(800, 1100),
+      chao(440, 650),
+      chao(850, 1100),
       chao(1200, 1600),
 
       new Retangulo2D(340, 580, 100, 20),
-      new Retangulo2D(700, 580, 100, 20),
+      new Retangulo2D(650, 580, 200, 20),
       new Retangulo2D(1100, 580, 100, 20),
       new Retangulo2D(170, 470, 130, 20),
-      new Retangulo2D(490, 470, 120, 20),
+      new Retangulo2D(320, 440, 110, 20),
+      new Retangulo2D(450, 410, 110, 20),
+      new Retangulo2D(580, 390, 110, 20),
+      new Retangulo2D(710, 430, 130, 20),
       new Retangulo2D(930, 480, 100, 20),
       new Retangulo2D(-40, -300, 40, 1000),
       new Retangulo2D(LARG_MUNDO, -300, 40, 1000),
@@ -116,7 +99,7 @@ class MeuJogo extends JS_CG_2D_API {
     //piscinas
     this.piscinas = [
       { tipo: "lava", x: 340, y: CHAO_Y, largura: 100, altura: 20 },
-      { tipo: "agua", x: 700, y: CHAO_Y, largura: 100, altura: 20 },
+      { tipo: "agua", x: 650, y: CHAO_Y, largura: 200, altura: 20 },
       { tipo: "limo", x: 1100, y: CHAO_Y, largura: 100, altura: 20 },
     ];
 
@@ -128,8 +111,11 @@ class MeuJogo extends JS_CG_2D_API {
     this.diamantes = [
       d(235, 435),
       d(390, 515),
-      d(550, 435),
-      d(750, 450),
+      d(390, 405),
+      d(500, 375),
+      d(635, 355),
+      d(780, 395),
+      d(550, 515),
       d(980, 445),
       d(1150, 450),
       d(1255, 515),
@@ -149,7 +135,6 @@ class MeuJogo extends JS_CG_2D_API {
     this.sprite = new Sprite(this.heroi.x, this.heroi.y);
     this.sprite.setAnimacao(this.framesParado);
 
-    //tempo
     this.iniciarTimer("relogio", 1, true, () => {
       if (this.estado !== "jogando") return;
 
@@ -255,6 +240,12 @@ class MeuJogo extends JS_CG_2D_API {
 
     if (this.botaoAtivo && this.portao.y > PORTAO_Y_ABERTO) {
       this.portao.y -= 5;
+    }
+
+    if (!this.ponteAtiva && this.colisao(this.heroi, this.botaoPonte)) {
+      this.ponteAtiva = true;
+      this.solidos.push(this.ponte);
+      EfeitosSonoros.tocarSom("porta");
     }
 
     //diamantes
@@ -378,7 +369,7 @@ class MeuJogo extends JS_CG_2D_API {
 
   desenharMundo() {
     for (const s of this.solidos) {
-      if (s === this.portao) continue;
+      if (s === this.portao || s === this.ponte) continue;
 
       this.preenchimento("#5b5240");
       this.retangulo(s, Estilo.PREENCHIDO);
@@ -387,12 +378,37 @@ class MeuJogo extends JS_CG_2D_API {
       this.retangulo(s.x, s.y, s.largura, 4, Estilo.PREENCHIDO);
     }
 
+    this.desenharPonte();
     this.desenharPortao();
     this.desenharBotao();
     this.desenharPorta();
     this.desenharDiamantes();
     this.desenharHeroi();
     this.desenharPiscinas(); // por cima do herói: dá a impressão de estar submerso
+  }
+
+  desenharPonte() {
+    if (!this.ponteAtiva) return;
+
+    this.preenchimento("#226c73");
+    this.retangulo(this.ponte, Estilo.PREENCHIDO);
+    this.preenchimento("#8fffe0");
+    this.retangulo(
+      this.ponte.x,
+      this.ponte.y,
+      this.ponte.largura,
+      4,
+      Estilo.PREENCHIDO,
+    );
+    this.contorno(2, "#c3fff1");
+
+    for (
+      let x = this.ponte.x + 25;
+      x < this.ponte.x + this.ponte.largura;
+      x += 35
+    ) {
+      this.linha(x, this.ponte.y + 4, x, this.ponte.y + this.ponte.altura);
+    }
   }
 
   desenharPortao() {
@@ -417,13 +433,16 @@ class MeuJogo extends JS_CG_2D_API {
   }
 
   desenharBotao() {
-    const b = this.botao;
-    const afund = this.botaoAtivo ? 5 : 0;
+    this.desenharPlaca(this.botaoPonte, this.ponteAtiva, "#48bdb2");
+    this.desenharPlaca(this.botao, this.botaoAtivo, "#ff5a4d");
+  }
+
+  desenharPlaca(b, ativada, corInativa) {
+    const afund = ativada ? 5 : 0;
 
     this.preenchimento("#2c2a38");
     this.retangulo(b.x - 6, CHAO_Y - 4, b.largura + 12, 4, Estilo.PREENCHIDO);
-
-    this.preenchimento(this.botaoAtivo ? "#6dff7a" : "#ff5a4d");
+    this.preenchimento(ativada ? "#6dff7a" : corInativa);
     this.retangulo(
       b.x,
       b.y + afund,
