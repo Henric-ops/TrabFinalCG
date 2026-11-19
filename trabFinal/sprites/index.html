@@ -3,25 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Meu Jogo 2D</title>
+    <title>Fireboy - Templo</title>
     <style>
+      * { box-sizing: border-box; }
       body {
         margin: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
         min-height: 100vh;
-        background-color: #0e0d0d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(ellipse at center, #34331d 0%, #101009 75%);
+        font-family: Arial, sans-serif;
       }
-
       canvas {
-        border: 2px solid white;
+        display: block;
+        width: min(96vw, 850px);
+        height: auto;
+        border: 3px solid #766b39;
+        box-shadow: 0 0 35px rgba(0, 0, 0, .75);
+        image-rendering: auto;
       }
     </style>
   </head>
-
   <body>
-    <canvas id="meuCanvas"></canvas>
+    <canvas id="meuCanvas" width="850" height="650"></canvas>
     <script src="js_cg_2d_api.js"></script>
     <script src="jogo.js"></script>
   </body>

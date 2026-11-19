@@ -1,313 +1,252 @@
-const PASTA = ".";
-const LARG_TELA = 800;
-const ALT_TELA = 600;
-const LARG_MUNDO = 1600;
-const CHAO_Y = 560;
-const VEL_ANDAR = 4;
-const COLISOR_L = 30;
-const COLISOR_A = 48;
-const ALTURA_SPRITE = 60;
-const TEMPO_FASE = 60;
-const PTS_DIAMANTE = 100;
-const PTS_SEGUNDO = 10;
-const PORTAO_Y_FECHADO = 340;
-const PORTAO_Y_ABERTO = -240;
+const LARG_TELA = 850;
+const ALT_TELA = 650;
+const VEL_ANDAR = 3.6;
+const LARG_HEROI = 32;
+const ALT_HEROI = 48;
+const TEMPO_FASE = 180;
+const PONTOS_DIAMANTE = 100;
 
-function novaImagem(src) {
+function carregarImagem(caminho) {
   const img = new Image();
-  img.src = src;
+  img.src = caminho;
   return img;
 }
 
 class MeuJogo extends JS_CG_2D_API {
   acaoAoIniciar() {
-    this.framesParado = this.carregarFrames("fireParado", 5, `${PASTA}/parado`);
-    this.framesCorrer = this.carregarFrames("fireCorrer", 5, `${PASTA}/correr`);
+    // Sprites originais do Fireboy extraídos do jogo de referência.
+    this.imgCorpo = carregarImagem("images/fire/body.png");
+    this.imgRostoParado = carregarImagem("images/fire/face-idle.png");
+    this.imgRostoAndando = carregarImagem("images/fire/face-walking.png");
+    this.imgDiamantes = carregarImagem("images/gems.png");
+    this.imgPortas = carregarImagem("images/doors.png");
+    this.imgAlavanca = carregarImagem("images/lever.png");
+    this.imgPedra = carregarImagem("images/rock.png");
+    this.imgFundoMenu = carregarImagem("images/menu-bg.png");
 
-    this.framesPulando = this.carregarFrames(
-      "firePulando",
-      5,
-      `${PASTA}/pular`,
-    );
+    this.sons = {
+      pulo: "sounds/jump.mp3",
+      morte: "sounds/death.mp3",
+      porta: "sounds/door.mp3",
+      alavanca: "sounds/lever-button.mp3",
+      diamante: "sounds/gem.mp3",
+      rio: "sounds/river.mp3",
+    };
 
-    this.framesCaindo = this.carregarFrames("fireCair", 5, `${PASTA}/cair`);
-    this.imgDiamanteVermelho = novaImagem(
-      `${PASTA}/diamante/diamante_vermelho.png`,
-    );
-
-    this.imgDiamanteAzul = novaImagem(`${PASTA}/diamante/diamante_azul.png`);
-    this.imgPortaFechada = novaImagem(`${PASTA}/porta_fechada.png`);
-    this.imgPortaAberta = novaImagem(`${PASTA}/porta_aberta.png`);
-
-    EfeitosSonoros.carregarSom("pulo", `${PASTA}/audio/pulo.wav`);
-    EfeitosSonoros.carregarSom("diamante", `${PASTA}/audio/diamante.wav`);
-    EfeitosSonoros.carregarSom("porta", `${PASTA}/audio/porta.wav`);
-    EfeitosSonoros.carregarSom("vitoria", `${PASTA}/audio/vitoria.wav`);
-    EfeitosSonoros.carregarSom("derrota", `${PASTA}/audio/derrota.wav`);
-    EfeitosSonoros.volumeSom("pulo", 0.5);
-    EfeitosSonoros.volumeSom("diamante", 0.7);
+    EfeitosSonoros.carregarSom("pulo", this.sons.pulo);
+    EfeitosSonoros.carregarSom("morte", this.sons.morte);
+    EfeitosSonoros.carregarSom("porta", this.sons.porta);
+    EfeitosSonoros.carregarSom("alavanca", this.sons.alavanca);
+    EfeitosSonoros.carregarSom("diamante", this.sons.diamante);
+    EfeitosSonoros.volumeSom("pulo", 0.45);
+    EfeitosSonoros.volumeSom("diamante", 0.55);
 
     this.teclas = {};
-    this.escalaHeroi = 0;
     this.iniciarFase();
   }
 
   iniciarFase() {
     this.pararTimer("relogio");
     this.pararTimer("fimFase");
+
     this.estado = "jogando";
-    this.motivoDerrota = "";
     this.pontos = 0;
-    this.coletados = 0;
-    this.bonusTempo = 0;
-    this.tempoRestante = TEMPO_FASE;
+    this.tempo = TEMPO_FASE;
     this.quadro = 0;
-    this.quadroFim = 0;
     this.direcao = 1;
     this.puloSegurado = false;
-    this.botaoAtivo = false;
-    this.ponteAtiva = false;
     this.portaAberta = false;
-    this.cameraX = 0;
+    this.alavancaAtiva = false;
+    this.botaoRoxoAtivo = false;
+    this.botaoVerdeAtivo = false;
+    this.plataformaMovelY = 347;
+    this.plataformaMovelDestino = 412;
+    this.pedraY = 173;
+    this.pedraVelY = 0;
+    this.pedraCaiu = false;
+    this.motivoDerrota = "";
 
-    const chao = (x1, x2) => new Retangulo2D(x1, CHAO_Y, x2 - x1, 40);
-
-    this.portao = new Retangulo2D(1330, PORTAO_Y_FECHADO, 20, 220);
-    this.ponte = new Retangulo2D(650, 500, 200, 20);
-    this.botaoPonte = new Retangulo2D(520, CHAO_Y - 8, 56, 8);
-
-    this.solidos = [
-      chao(0, 340),
-      chao(440, 650),
-      chao(850, 1100),
-      chao(1200, 1600),
-
-      new Retangulo2D(340, 580, 100, 20),
-      new Retangulo2D(650, 580, 200, 20),
-      new Retangulo2D(1100, 580, 100, 20),
-      new Retangulo2D(170, 470, 130, 20),
-      new Retangulo2D(320, 440, 110, 20),
-      new Retangulo2D(450, 410, 110, 20),
-      new Retangulo2D(580, 390, 110, 20),
-      new Retangulo2D(710, 430, 130, 20),
-      new Retangulo2D(930, 480, 100, 20),
-      new Retangulo2D(-40, -300, 40, 1000),
-      new Retangulo2D(LARG_MUNDO, -300, 40, 1000),
-      this.portao,
+    // O layout foi adaptado do primeiro nível do ZIP FireBoy-WaterGirl.
+    // As alturas foram ajustadas para a resolução usada pela API da disciplina.
+    this.plataformas = [
+      new Retangulo2D(0, 628, 300, 22),
+      new Retangulo2D(300, 641, 150, 9),
+      new Retangulo2D(450, 628, 100, 22),
+      new Retangulo2D(550, 641, 150, 9),
+      new Retangulo2D(700, 628, 150, 22),
+      new Retangulo2D(0, 542, 250, 22),
+      new Retangulo2D(750, 563, 100, 65),
+      new Retangulo2D(0, 455, 350, 22),
+      new Retangulo2D(300, 477, 200, 22),
+      new Retangulo2D(500, 490, 120, 9),
+      new Retangulo2D(620, 477, 100, 22),
+      new Retangulo2D(125, 347, 700, 22),
+      new Retangulo2D(0, 173, 150, 87),
+      new Retangulo2D(425, 217, 150, 43),
+      new Retangulo2D(0, 260, 725, 22),
+      new Retangulo2D(225, 87, 100, 22),
+      new Retangulo2D(325, 87, 100, 65),
+      new Retangulo2D(325, 152, 525, 22),
+      new Retangulo2D(0, 0, 25, 650),
+      new Retangulo2D(825, 0, 25, 650),
+      new Retangulo2D(0, 0, 850, 18),
     ];
 
-    //piscinas
-    this.piscinas = [
-      { tipo: "lava", x: 340, y: CHAO_Y, largura: 100, altura: 20 },
-      { tipo: "agua", x: 650, y: CHAO_Y, largura: 200, altura: 20 },
-      { tipo: "limo", x: 1100, y: CHAO_Y, largura: 100, altura: 20 },
-    ];
+    // Plataforma móvel acionada pela alavanca.
+    this.plataformaAlavanca = new Retangulo2D(25, this.plataformaMovelY, 100, 22);
+    this.plataformaBotao = new Retangulo2D(725, 260, 100, 22);
+    this.plataformas.push(this.plataformaAlavanca, this.plataformaBotao);
 
-    this.botao = new Retangulo2D(900, CHAO_Y - 8, 60, 8);
-    this.porta = new Retangulo2D(1490, CHAO_Y - 70, 46, 70);
-
-    const d = (cx, cy) => ({ x: cx - 13, y: cy - 13, largura: 26, altura: 26 });
+    this.heroi = new Personagem(55, 575, LARG_HEROI, ALT_HEROI, this.plataformas);
+    this.heroi.setGravidade(0.58);
+    this.heroi.setForcaPulo(-12.5);
+    this.heroi.setVelTerminal(14);
 
     this.diamantes = [
-      d(235, 435),
-      d(390, 515),
-      d(390, 405),
-      d(500, 375),
-      d(635, 355),
-      d(780, 395),
-      d(550, 515),
-      d(980, 445),
-      d(1150, 450),
-      d(1255, 515),
-      d(1420, 515),
+      { x: 350, y: 585, coletado: false },
+      { x: 195, y: 302, coletado: false },
+      { x: 270, y: 42, coletado: false },
+      { x: 475, y: 425, coletado: false },
+      { x: 565, y: 315, coletado: false },
+    ];
+    this.totalDiamantes = this.diamantes.length;
+    this.coletados = 0;
+
+    // Fogo é seguro para o Fireboy; água e poços verdes são fatais.
+    this.rios = [
+      { x: 300, y: 628, largura: 150, altura: 22, tipo: "fogo", fase: 0 },
+      { x: 550, y: 628, largura: 150, altura: 22, tipo: "agua", fase: 1 },
+      { x: 500, y: 477, largura: 120, altura: 13, tipo: "perigo", fase: 2 },
     ];
 
-    this.totalDiamantes = this.diamantes.length;
-
-    this.heroi = new Personagem(
-      60,
-      CHAO_Y - COLISOR_A,
-      COLISOR_L,
-      COLISOR_A,
-      this.solidos,
-    );
-
-    this.sprite = new Sprite(this.heroi.x, this.heroi.y);
-    this.sprite.setAnimacao(this.framesParado);
+    this.alavanca = { x: 185, y: 418, largura: 34, altura: 34 };
+    this.botaoRoxo = { x: 275, y: 325, largura: 42, altura: 15 };
+    this.botaoVerde = { x: 650, y: 462, largura: 42, altura: 15 };
+    this.porta = { x: 625, y: 87, largura: 48, altura: 65 };
 
     this.iniciarTimer("relogio", 1, true, () => {
       if (this.estado !== "jogando") return;
-
-      this.tempoRestante--;
-
-      if (this.tempoRestante <= 0) {
-        this.tempoRestante = 0;
-
-        this.perder("O tempo acabou!");
-      }
+      this.tempo--;
+      if (this.tempo <= 0) this.perder("O tempo acabou!");
     });
   }
 
-  perder(motivo) {
-    if (this.estado !== "jogando") return;
-
-    this.estado = "derrota";
-    this.motivoDerrota = motivo;
-    this.quadroFim = this.quadro;
-    this.pararTimer("relogio");
-
-    EfeitosSonoros.tocarSom("derrota");
-  }
-
-  abrirPorta() {
-    this.estado = "porta";
-    this.portaAberta = true;
-
-    this.bonusTempo = this.tempoRestante * PTS_SEGUNDO;
-
-    this.pararTimer("relogio");
-
-    EfeitosSonoros.tocarSom("porta");
-
-    this.iniciarTimer("fimFase", 0.8, false, () => {
-      this.pontos += this.bonusTempo;
-      this.estado = "vitoria";
-      this.quadroFim = this.quadro;
-
-      EfeitosSonoros.tocarSom("vitoria");
-    });
-  }
-
-  fimDeJogo() {
-    return this.estado === "vitoria" || this.estado === "derrota";
-  }
-
-  atualizar(dt) {
+  atualizar() {
     this.quadro++;
-
     if (this.estado !== "jogando") return;
 
-    const esq = this.teclas["arrowleft"] || this.teclas["a"];
-    const dir = this.teclas["arrowright"] || this.teclas["d"];
+    const esquerda = this.teclas.arrowleft || this.teclas.a;
+    const direita = this.teclas.arrowright || this.teclas.d;
+    const pular = this.teclas.arrowup || this.teclas.w || this.teclas[" "];
 
-    const querPular =
-      this.teclas["arrowup"] || this.teclas["w"] || this.teclas[" "];
+    let movimento = 0;
+    if (esquerda && !direita) movimento = -1;
+    if (direita && !esquerda) movimento = 1;
+    if (movimento !== 0) this.direcao = movimento;
 
-    let vx = 0;
+    this.heroi.prevX = this.heroi.x;
+    this.heroi.x += movimento * VEL_ANDAR;
 
-    if (esq && !dir) vx = -1;
-    if (dir && !esq) vx = 1;
-    if (vx !== 0) this.direcao = vx;
-
-    this.heroi.x += vx * VEL_ANDAR;
-
-    if (querPular && !this.puloSegurado && this.heroi.isNoChao()) {
+    if (pular && !this.puloSegurado && this.heroi.isNoChao()) {
       this.heroi.pular();
-
       EfeitosSonoros.tocarSom("pulo", false, true);
     }
+    this.puloSegurado = !!pular;
 
-    this.puloSegurado = !!querPular;
+    // Atualiza a plataforma acionada pela alavanca.
+    if (this.alavancaAtiva) {
+      const destino = this.plataformaMovelDestino;
+      if (this.plataformaAlavanca.y < destino) {
+        this.plataformaAlavanca.y = Math.min(destino, this.plataformaAlavanca.y + 2);
+      }
+    }
+    this.plataformaAlavanca.y = this.plataformaAlavanca.y;
+
+    // A barra roxa desce quando o botão é pressionado.
+    if (this.botaoRoxoAtivo) {
+      this.plataformaBotao.y = Math.min(325, this.plataformaBotao.y + 2);
+    }
+
+    this.heroi.setPlataformas(this.plataformas);
     this.heroi.atualizar();
 
-    let frames;
-    let delay;
+    // Mantém o personagem dentro dos limites do cenário.
+    this.heroi.x = Math.max(25, Math.min(825 - LARG_HEROI, this.heroi.x));
 
-    if (!this.heroi.isNoChao()) {
-      frames = this.heroi.velY < 0 ? this.framesPulando : this.framesCaindo;
-
-      delay = 5;
-    } else if (vx !== 0) {
-      frames = this.framesCorrer;
-
-      delay = 4;
-    } else {
-      frames = this.framesParado;
-
-      delay = 8;
+    // Pedra que cai ao ser alcançada, baseada no obstáculo do nível original.
+    if (!this.pedraCaiu && this.heroi.x > 440 && this.heroi.y < 230) {
+      this.pedraCaiu = true;
+    }
+    if (this.pedraCaiu && this.pedraY < 570) {
+      this.pedraVelY = Math.min(this.pedraVelY + 0.35, 8);
+      this.pedraY += this.pedraVelY;
+    }
+    if (this.pedraCaiu && this.colisao(this.heroi, {
+      x: 500, y: this.pedraY, largura: 42, altura: 42
+    })) {
+      this.perder("Uma pedra atingiu o Fireboy!");
+      return;
     }
 
-    this.sprite.delayAnimacao = delay;
-    this.sprite.setAnimacao(frames);
-    this.sprite.setPosicao(this.heroi.x, this.heroi.y);
-    this.sprite.atualizar();
-
-    // abre portão
-    if (!this.botaoAtivo && this.colisao(this.heroi, this.botao)) {
-      this.botaoAtivo = true;
-      EfeitosSonoros.tocarSom("porta");
-    }
-
-    if (this.botaoAtivo && this.portao.y > PORTAO_Y_ABERTO) {
-      this.portao.y -= 5;
-    }
-
-    if (!this.ponteAtiva && this.colisao(this.heroi, this.botaoPonte)) {
-      this.ponteAtiva = true;
-      this.solidos.push(this.ponte);
-      EfeitosSonoros.tocarSom("porta");
-    }
-
-    //diamantes
-    for (let i = this.diamantes.length - 1; i >= 0; i--) {
-      if (this.colisao(this.heroi, this.diamantes[i])) {
-        this.diamantes.splice(i, 1);
-
+    // Coleta dos cristais de fogo.
+    for (const d of this.diamantes) {
+      if (!d.coletado && this.colisao(this.heroi, {
+        x: d.x, y: d.y, largura: 26, altura: 28
+      })) {
+        d.coletado = true;
         this.coletados++;
-        this.pontos += PTS_DIAMANTE;
+        this.pontos += PONTOS_DIAMANTE;
         EfeitosSonoros.tocarSom("diamante", false, true);
       }
     }
 
-    for (const p of this.piscinas) {
-      if (p.tipo === "lava") continue;
+    // Botões ativados ao pisar neles.
+    if (!this.botaoRoxoAtivo && this.colisao(this.heroi, this.botaoRoxo)) {
+      this.botaoRoxoAtivo = true;
+      EfeitosSonoros.tocarSom("alavanca", false, true);
+    }
+    if (!this.botaoVerdeAtivo && this.colisao(this.heroi, this.botaoVerde)) {
+      this.botaoVerdeAtivo = true;
+      EfeitosSonoros.tocarSom("alavanca", false, true);
+    }
 
-      // zona mortal
-      const zona = {
-        x: p.x,
-        y: p.y + 6,
-
-        largura: p.largura,
-        altura: p.altura - 6,
-      };
-
-      if (this.colisao(this.heroi, zona)) {
-        this.perder(
-          p.tipo === "agua"
-            ? "O Fireboy não pode tocar na água!"
-            : "O limo verde é mortal!",
-        );
-
+    // A água e o poço verde eliminam o Fireboy. O rio de fogo é seguro.
+    for (const rio of this.rios) {
+      if (rio.tipo !== "fogo" && this.colisao(this.heroi, rio)) {
+        this.perder(rio.tipo === "agua" ? "O Fireboy não pode tocar na água!" : "Você caiu em um poço mortal!");
         return;
       }
     }
 
-    //porta
+    // A saída só conclui a fase depois de alcançar a porta de fogo.
     if (this.colisao(this.heroi, this.porta)) {
-      this.abrirPorta();
-
+      this.vencer();
       return;
     }
 
-    //câmera segue o jogador
-
-    const alvo = this.heroi.x + COLISOR_L / 2 - LARG_TELA / 2;
-    this.cameraX = Math.max(0, Math.min(LARG_MUNDO - LARG_TELA, alvo));
+    if (this.heroi.y > ALT_TELA) this.perder("O Fireboy caiu do cenário!");
   }
 
   teclaPressionada(e) {
-    const k = e.key.toLowerCase();
-    this.teclas[k] = true;
-
+    const tecla = e.key.toLowerCase();
+    this.teclas[tecla] = true;
     if (e.repeat) return;
-    if (k === "f") this.telaCheia();
-    if (k === "r") this.iniciarFase();
-
-    if (
-      k === "enter" &&
-      this.fimDeJogo() &&
-      this.quadro - this.quadroFim > 30
-    ) {
+    if (tecla === "f") this.telaCheia();
+    if (tecla === "r") this.iniciarFase();
+    if (tecla === "e" && this.estado === "jogando") {
+      const perto = this.colisao(this.heroi, {
+        x: this.alavanca.x - 24,
+        y: this.alavanca.y - 28,
+        largura: this.alavanca.largura + 48,
+        altura: this.alavanca.altura + 56,
+      });
+      if (perto) {
+        this.alavancaAtiva = !this.alavancaAtiva;
+        this.plataformaMovelDestino = this.alavancaAtiva ? 412 : 347;
+        EfeitosSonoros.tocarSom("alavanca", false, true);
+      }
+    }
+    if ((tecla === "enter" || tecla === " ") && this.estado !== "jogando") {
       this.iniciarFase();
     }
   }
@@ -316,323 +255,228 @@ class MeuJogo extends JS_CG_2D_API {
     this.teclas[e.key.toLowerCase()] = false;
   }
 
-  cliqueDoMouse(e) {
-    //clique na tela final reinicia
-    if (this.fimDeJogo() && this.quadro - this.quadroFim > 30)
-      this.iniciarFase();
+  cliqueDoMouse() {
+    if (this.estado !== "jogando") this.iniciarFase();
+  }
+
+  perder(motivo) {
+    if (this.estado !== "jogando") return;
+    this.estado = "derrota";
+    this.motivoDerrota = motivo;
+    this.pararTimer("relogio");
+    EfeitosSonoros.tocarSom("morte");
+  }
+
+  vencer() {
+    if (this.estado !== "jogando") return;
+    this.estado = "vitoria";
+    this.portaAberta = true;
+    this.pararTimer("relogio");
+    this.pontos += this.tempo * 10;
+    EfeitosSonoros.tocarSom("porta");
   }
 
   desenhar() {
-    this.limparTela("#0b0a12");
-    const esc = Math.min(
-      this.larguraTela() / LARG_TELA,
-      this.alturaTela() / ALT_TELA,
-    );
-
-    const dx = (this.larguraTela() - LARG_TELA * esc) / 2;
-    const dy = (this.alturaTela() - ALT_TELA * esc) / 2;
-
-    this.empilhar();
-    this.transladar(dx, dy);
-    this.escalar(esc, esc);
-    this.gc.beginPath();
-    this.gc.rect(0, 0, LARG_TELA, ALT_TELA);
-    this.gc.clip();
+    this.limparTela("#17170d");
     this.desenharFundo();
-    this.empilhar();
-    this.transladar(-this.cameraX, 0);
-    this.desenharMundo();
-    this.desempilhar();
+    this.desenharPlataformas();
+    this.desenharRios();
+    this.desenharObjetos();
+    this.desenharPersonagem();
     this.desenharHUD();
-    this.desenharTelaFinal();
-    this.desempilhar();
+    if (this.estado !== "jogando") this.desenharTelaFinal();
   }
 
   desenharFundo() {
-    this.preenchimento("#1f1b2e");
+    // Templo em tons oliva, com paredes de blocos como no jogo de referência.
+    this.preenchimento("#34351b");
     this.retangulo(0, 0, LARG_TELA, ALT_TELA, Estilo.PREENCHIDO);
-
-    this.contorno(1, "rgba(255, 255, 255, 0.05)");
-
-    for (let y = 40; y < ALT_TELA; y += 40) {
-      this.linha(0, y, LARG_TELA, y);
+    for (let y = 0; y < ALT_TELA; y += 50) {
+      this.preenchimento(y % 100 === 0 ? "#414126" : "#393a20");
+      this.retangulo(0, y, LARG_TELA, 48, Estilo.PREENCHIDO);
+      this.contorno(2, "#252613");
+      this.retangulo(0, y, LARG_TELA, 48, Estilo.LINHAS);
+      for (let x = (y / 50) % 2 === 0 ? 0 : 25; x < LARG_TELA; x += 50) {
+        this.linha(x, y, x, y + 48);
+      }
     }
+    this.preenchimento("rgba(238, 218, 116, 0.07)");
+    this.retangulo(280, 0, 300, ALT_TELA, Estilo.PREENCHIDO);
+  }
 
-    const desloc = -((this.cameraX * 0.5) % 80);
-
-    for (let linhaTijolo = 0, y = 0; y < ALT_TELA; y += 40, linhaTijolo++) {
-      for (let x = desloc + (linhaTijolo % 2) * 40; x < LARG_TELA; x += 80) {
-        this.linha(x, y, x, y + 40);
+  desenharPlataformas() {
+    for (const p of this.plataformas) {
+      this.preenchimento("#756a36");
+      this.retangulo(p.x, p.y, p.largura, p.altura, Estilo.PREENCHIDO);
+      this.contorno(2, "#3f3a1d");
+      this.retangulo(p.x, p.y, p.largura, p.altura, Estilo.LINHAS);
+      this.preenchimento("#9a8944");
+      this.retangulo(p.x, p.y, p.largura, 4, Estilo.PREENCHIDO);
+      for (let x = p.x + 25; x < p.x + p.largura; x += 50) {
+        this.linha(x, p.y + 4, x, p.y + p.altura);
       }
     }
   }
 
-  desenharMundo() {
-    for (const s of this.solidos) {
-      if (s === this.portao || s === this.ponte) continue;
-
-      this.preenchimento("#5b5240");
-      this.retangulo(s, Estilo.PREENCHIDO);
-
-      this.preenchimento("#7a6e55");
-      this.retangulo(s.x, s.y, s.largura, 4, Estilo.PREENCHIDO);
-    }
-
-    this.desenharPonte();
-    this.desenharPortao();
-    this.desenharBotao();
-    this.desenharPorta();
-    this.desenharDiamantes();
-    this.desenharHeroi();
-    this.desenharPiscinas(); // por cima do herói: dá a impressão de estar submerso
-  }
-
-  desenharPonte() {
-    if (!this.ponteAtiva) return;
-
-    this.preenchimento("#226c73");
-    this.retangulo(this.ponte, Estilo.PREENCHIDO);
-    this.preenchimento("#8fffe0");
-    this.retangulo(
-      this.ponte.x,
-      this.ponte.y,
-      this.ponte.largura,
-      4,
-      Estilo.PREENCHIDO,
-    );
-    this.contorno(2, "#c3fff1");
-
-    for (
-      let x = this.ponte.x + 25;
-      x < this.ponte.x + this.ponte.largura;
-      x += 35
-    ) {
-      this.linha(x, this.ponte.y + 4, x, this.ponte.y + this.ponte.altura);
-    }
-  }
-
-  desenharPortao() {
-    const g = this.portao;
-
-    this.preenchimento("#8b8fa3");
-    this.retangulo(g, Estilo.PREENCHIDO);
-    this.contorno(2, "#555a6e");
-
-    for (let y = g.y + 14; y < g.y + g.altura; y += 20) {
-      this.linha(g.x, y, g.x + g.largura, y);
-    }
-
-    this.preenchimento("#555a6e");
-    this.retangulo(
-      g.x - 4,
-      g.y + g.altura - 6,
-      g.largura + 8,
-      6,
-      Estilo.PREENCHIDO,
-    );
-  }
-
-  desenharBotao() {
-    this.desenharPlaca(this.botaoPonte, this.ponteAtiva, "#48bdb2");
-    this.desenharPlaca(this.botao, this.botaoAtivo, "#ff5a4d");
-  }
-
-  desenharPlaca(b, ativada, corInativa) {
-    const afund = ativada ? 5 : 0;
-
-    this.preenchimento("#2c2a38");
-    this.retangulo(b.x - 6, CHAO_Y - 4, b.largura + 12, 4, Estilo.PREENCHIDO);
-    this.preenchimento(ativada ? "#6dff7a" : corInativa);
-    this.retangulo(
-      b.x,
-      b.y + afund,
-      b.largura,
-      b.altura - afund,
-      Estilo.PREENCHIDO,
-    );
-  }
-
-  desenharPorta() {
-    const p = this.porta;
-    const cx = p.x + p.largura / 2;
-    const img = this.portaAberta ? this.imgPortaAberta : this.imgPortaFechada;
-
-    if (!this.desenharProporcional(img, cx, p.y + p.altura, 76)) {
-      this.preenchimento(this.portaAberta ? "#ffd24a" : "#8a4b20");
-      this.retangulo(p, Estilo.PREENCHIDO);
-    }
-
-    //setinha da porta
-    if (!this.portaAberta) {
-      const salto = Math.sin(this.quadro * 0.1) * 4;
-      this.preenchimento("#ffd24a");
-
-      this.triangulo(
-        cx - 9,
-        p.y - 34 + salto,
-        cx + 9,
-        p.y - 34 + salto,
-        cx,
-        p.y - 20 + salto,
-        Estilo.PREENCHIDO,
-      );
-    }
-  }
-
-  desenharDiamantes() {
-    this.gc.globalAlpha = 0.55;
-    this.gc.globalAlpha = 1;
-
-    for (const dm of this.diamantes) {
-      const flutua = Math.sin(this.quadro * 0.08 + dm.x) * 3;
-      const cx = dm.x + dm.largura / 2;
-      const base = dm.y + dm.altura + 2 + flutua;
-
-      if (!this.desenharProporcional(this.imgDiamanteVermelho, cx, base, 30)) {
-        this.preenchimento("#ff3b30");
-
-        this.circulo(
-          dm.x,
-          dm.y + flutua,
-          dm.largura,
-          dm.altura,
-          Estilo.PREENCHIDO,
-        );
+  desenharRios() {
+    for (const rio of this.rios) {
+      const cor = rio.tipo === "fogo"
+        ? ["#d83208", "#ff9b19"]
+        : rio.tipo === "agua"
+          ? ["#087ac2", "#72d8ff"]
+          : ["#347d21", "#b1ec47"];
+      this.preenchimento(cor[0]);
+      this.retangulo(rio.x, rio.y, rio.largura, rio.altura, Estilo.PREENCHIDO);
+      this.preenchimento(cor[1]);
+      for (let x = rio.x; x < rio.x + rio.largura; x += 18) {
+        const onda = Math.sin(this.quadro * 0.08 + x * 0.1) * 3;
+        this.retangulo(x, rio.y + onda, 13, 4, Estilo.PREENCHIDO);
       }
     }
   }
 
-  desenharHeroi() {
-    if (this.portaAberta) return; // entrou na porta
-
-    if (!this.escalaHeroi) {
-      const ref = this.framesParado[0];
-
-      if (ref.complete && ref.naturalHeight > 0) {
-        this.escalaHeroi = ALTURA_SPRITE / ref.naturalHeight;
+  desenharObjetos() {
+    // Cristais de fogo: recorte do sprite sheet original (imagem gems.png).
+    for (const d of this.diamantes) {
+      if (d.coletado) continue;
+      const flutua = Math.sin(this.quadro * 0.08 + d.x) * 3;
+      if (this.imgDiamantes.complete && this.imgDiamantes.naturalWidth > 0) {
+        this.gc.drawImage(this.imgDiamantes, 24, 0, 24, 20, d.x, d.y + flutua, 30, 27);
+      } else {
+        this.preenchimento("#ff3328");
+        this.triangulo(d.x + 15, d.y + flutua, d.x + 29, d.y + 13 + flutua, d.x + 15, d.y + 27 + flutua, Estilo.PREENCHIDO);
       }
     }
 
-    const img = this.sprite.getImagem();
+    // Alavanca original do pacote.
+    if (this.imgAlavanca.complete && this.imgAlavanca.naturalWidth > 0) {
+      this.imagem(this.imgAlavanca, this.alavanca.x, this.alavanca.y, 42, 30);
+    } else {
+      this.preenchimento(this.alavancaAtiva ? "#ffcc45" : "#9b9b9b");
+      this.retangulo(this.alavanca.x, this.alavanca.y, 8, 30, Estilo.PREENCHIDO);
+    }
 
-    const w = img.naturalWidth * this.escalaHeroi;
-    const h = img.naturalHeight * this.escalaHeroi;
-    const centroX = this.heroi.x + COLISOR_L / 2;
-    const base = this.heroi.y + COLISOR_A;
+    this.desenharBotao(this.botaoRoxo, this.botaoRoxoAtivo, "#9d58ce");
+    this.desenharBotao(this.botaoVerde, this.botaoVerdeAtivo, "#58b94d");
+
+    // Porta de fogo no destino.
+    this.preenchimento("#282313");
+    this.retangulo(this.porta.x - 5, this.porta.y - 4, this.porta.largura + 10, this.porta.altura + 8, Estilo.PREENCHIDO);
+    if (this.imgPortas.complete && this.imgPortas.naturalWidth > 0) {
+      this.gc.drawImage(this.imgPortas, this.portaAberta ? 7 * 111 : 0, 0, 111, 120,
+        this.porta.x - 5, this.porta.y - 4, this.porta.largura + 10, this.porta.altura + 8);
+    } else {
+      this.preenchimento("#9a3a16");
+      this.retangulo(this.porta, Estilo.PREENCHIDO);
+    }
+
+    // Pedra do primeiro nível.
+    if (this.pedraCaiu) {
+      if (this.imgPedra.complete && this.imgPedra.naturalWidth > 0) {
+        this.imagem(this.imgPedra, 500, this.pedraY, 42, 42);
+      } else {
+        this.preenchimento("#777777");
+        this.circulo(500, this.pedraY, 42, 42, Estilo.PREENCHIDO);
+      }
+    }
+
+    this.preenchimento("#e6d38a");
+    this.texto("E", this.alavanca.x + 14, this.alavanca.y - 7, 15, "bold");
+  }
+
+  desenharBotao(b, ativo, cor) {
+    this.preenchimento("#242414");
+    this.retangulo(b.x - 4, b.y + 8, b.largura + 8, 8, Estilo.PREENCHIDO);
+    this.preenchimento(ativo ? "#d7e99b" : cor);
+    this.retangulo(b.x, b.y + (ativo ? 5 : 0), b.largura, b.altura - (ativo ? 5 : 0), Estilo.PREENCHIDO);
+    this.contorno(2, "#292515");
+    this.retangulo(b.x, b.y, b.largura, b.altura, Estilo.LINHAS);
+  }
+
+  desenharPersonagem() {
+    const x = this.heroi.x;
+    const y = this.heroi.y;
+    const andando = !!(this.teclas.arrowleft || this.teclas.a || this.teclas.arrowright || this.teclas.d);
+    const noAr = !this.heroi.isNoChao();
+    const tempoAnimacao = Math.floor(this.quadro / (andando ? 7 : 12));
+    const corpoFrame = andando ? tempoAnimacao % 9 : 0;
+    const rostoFrame = tempoAnimacao % 5;
 
     this.empilhar();
-    this.transladar(centroX, base - h);
-
-    if (this.direcao < 0) this.escalar(-1, 1);
-    this.imagem(img, -w / 2, 0, w, h);
+    if (this.direcao < 0) {
+      this.transladar(x * 2 + LARG_HEROI, 0);
+      this.escalar(-1, 1);
+      this.desenharPartesPersonagem(-x - LARG_HEROI, y, corpoFrame, rostoFrame, andando, noAr);
+    } else {
+      this.desenharPartesPersonagem(x, y, corpoFrame, rostoFrame, andando, noAr);
+    }
     this.desempilhar();
   }
 
-  desenharPiscinas() {
-    const estilos = {
-      lava: { corpo: "rgba(235, 70, 15, 0.92)", topo: "#ffb02e" },
-      agua: { corpo: "rgba(40, 120, 250, 0.85)", topo: "#9fcdff" },
-      limo: { corpo: "rgba(60, 190, 60, 0.88)", topo: "#b4f59a" },
-    };
-
-    for (const p of this.piscinas) {
-      const cor = estilos[p.tipo];
-
-      this.preenchimento(cor.corpo);
-      this.retangulo(p.x, p.y, p.largura, p.altura, Estilo.PREENCHIDO);
-
-      this.preenchimento(cor.topo);
-      this.retangulo(p.x, p.y, p.largura, 3, Estilo.PREENCHIDO);
+  desenharPartesPersonagem(x, y, corpoFrame, rostoFrame, andando, noAr) {
+    if (this.imgCorpo.complete && this.imgCorpo.naturalWidth > 0) {
+      this.gc.drawImage(this.imgCorpo, corpoFrame * 105, 0, 105, 110, x + 2, y + 22, 29, 27);
+    }
+    const rosto = andando ? this.imgRostoAndando : this.imgRostoParado;
+    if (rosto.complete && rosto.naturalWidth > 0) {
+      if (andando) {
+        this.gc.drawImage(rosto, rostoFrame * 340, 0, 340, 245, x - 8, y - 5, 48, 38);
+      } else {
+        this.gc.drawImage(rosto, rostoFrame * 230, 0, 230, 355, x - 4, y - 8, 41, 43);
+      }
+    }
+    if (noAr) {
+      this.preenchimento("rgba(255, 120, 20, 0.18)");
+      this.circulo(x - 2, y + 2, 38, 46, Estilo.PREENCHIDO);
     }
   }
 
-  desenharProporcional(img, centroX, base, alturaAlvo) {
-    if (!img || !img.complete || img.naturalWidth === 0) return false;
-    const w = img.naturalWidth * (alturaAlvo / img.naturalHeight);
-
-    this.imagem(img, centroX - w / 2, base - alturaAlvo, w, alturaAlvo);
-    return true;
-  }
-
   desenharHUD() {
-    //pontuação
-    this.preenchimento("rgba(0, 0, 0, 0.55)");
-    this.retangulo(10, 10, 220, 58, Estilo.PREENCHIDO);
-    this.preenchimento("#ffffff");
-    this.texto(`Pontos: ${this.pontos}`, 20, 34, 22, "bold");
-    this.preenchimento("#ff8a7a");
-    this.texto(
-      `Diamantes: ${this.coletados}/${this.totalDiamantes}`,
-      20,
-      58,
-      18,
-    );
+    this.preenchimento("rgba(12, 12, 5, 0.82)");
+    this.retangulo(12, 10, 230, 65, Estilo.PREENCHIDO);
+    this.preenchimento("#fff1c0");
+    this.texto("FIREBOY - TEMPLO", 24, 32, 17, "bold");
+    this.texto(`Cristais: ${this.coletados}/${this.totalDiamantes}`, 24, 57, 18);
 
-    // Painel do tempo
-    this.preenchimento("rgba(0, 0, 0, 0.55)");
-    this.retangulo(LARG_TELA - 150, 10, 140, 40, Estilo.PREENCHIDO);
-    this.preenchimento(this.tempoRestante <= 10 ? "#ff5a4d" : "#ffffff");
-    this.texto(`Tempo: ${this.tempoRestante}`, LARG_TELA - 138, 38, 24, "bold");
+    this.preenchimento("rgba(12, 12, 5, 0.82)");
+    this.retangulo(710, 10, 128, 42, Estilo.PREENCHIDO);
+    this.preenchimento(this.tempo <= 20 ? "#ff6b3d" : "#fff1c0");
+    this.texto(`TEMPO: ${this.tempo}`, 722, 38, 19, "bold");
 
-    // Dica de controles nos primeiros segundos
-    if (this.estado === "jogando" && this.quadro < 600) {
+    if (this.quadro < 600) {
+      this.preenchimento("rgba(0, 0, 0, 0.65)");
+      this.retangulo(185, 605, 480, 32, Estilo.PREENCHIDO);
+      this.preenchimento("#fff1c0");
       this.gc.textAlign = "center";
-
-      this.preenchimento("rgba(255, 255, 255, 0.85)");
-      this.texto(
-        "← → / A D: andar    ↑ / W / Espaço: pular    F: tela cheia    R: reiniciar",
-        LARG_TELA / 2,
-        584,
-        16,
-      );
+      this.texto("A/D ou ←/→: mover   W/↑/ESPAÇO: pular   E: alavanca   R: reiniciar", 425, 627, 14);
       this.gc.textAlign = "left";
     }
   }
 
   desenharTelaFinal() {
-    if (!this.fimDeJogo()) return;
-
-    const ganhou = this.estado === "vitoria";
-    this.preenchimento("rgba(0, 0, 0, 0.7)");
+    this.preenchimento("rgba(0, 0, 0, 0.78)");
     this.retangulo(0, 0, LARG_TELA, ALT_TELA, Estilo.PREENCHIDO);
-    this.preenchimento(ganhou ? "#1f3d1f" : "#4a1a14");
-    this.retangulo(170, 150, 460, 290, Estilo.PREENCHIDO);
-    this.contorno(4, ganhou ? "#7dff7d" : "#ff7a59");
-    this.retangulo(170, 150, 460, 290, Estilo.LINHAS);
+    this.preenchimento(this.estado === "vitoria" ? "#343b17" : "#421c13");
+    this.retangulo(180, 185, 490, 260, Estilo.PREENCHIDO);
+    this.contorno(4, this.estado === "vitoria" ? "#e5c75a" : "#ed6841");
+    this.retangulo(180, 185, 490, 260, Estilo.LINHAS);
     this.gc.textAlign = "center";
-    this.preenchimento(ganhou ? "#9dff9d" : "#ff8a6b");
-    this.texto(ganhou ? "VITÓRIA!" : "VOCÊ PERDEU!", 400, 225, 54, "bold");
+    this.preenchimento(this.estado === "vitoria" ? "#ffe17a" : "#ff9873");
+    this.texto(this.estado === "vitoria" ? "FASE CONCLUÍDA!" : "FIM DE JOGO", 425, 250, 39, "bold");
     this.preenchimento("#ffffff");
-
-    if (ganhou) {
-      this.texto(
-        `Diamantes: ${this.coletados}/${this.totalDiamantes}`,
-        400,
-        280,
-        26,
-      );
-
-      this.texto(`Bônus de tempo: +${this.bonusTempo}`, 400, 316, 26);
-
-      this.texto(`Pontuação final: ${this.pontos}`, 400, 362, 32, "bold");
+    if (this.estado === "vitoria") {
+      this.texto("Você encontrou a saída do templo!", 425, 300, 21);
     } else {
-      this.texto(this.motivoDerrota, 400, 285, 26);
-
-      this.texto(
-        `Diamantes: ${this.coletados}/${this.totalDiamantes}`,
-        400,
-        325,
-        24,
-      );
-
-      this.texto(`Pontos: ${this.pontos}`, 400, 362, 28, "bold");
+      this.texto(this.motivoDerrota, 425, 300, 20);
     }
-
-    this.preenchimento("#ffd24a");
-    this.texto("Clique ou pressione R para jogar novamente", 400, 412, 20);
+    this.texto(`Cristais: ${this.coletados}/${this.totalDiamantes}`, 425, 345, 22);
+    this.texto(`Pontuação: ${this.pontos}`, 425, 378, 22, "bold");
+    this.preenchimento("#ffe17a");
+    this.texto("Pressione ENTER, ESPAÇO ou clique para jogar novamente", 425, 420, 17);
     this.gc.textAlign = "left";
   }
 }
+
 window.addEventListener("load", () => {
-  new MeuJogo("Fireboy", "meuCanvas", 800, 600, 60);
+  new MeuJogo("Fireboy - Templo", "meuCanvas", LARG_TELA, ALT_TELA, 60);
 });
